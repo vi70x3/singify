@@ -20,12 +20,11 @@ verb 3
 `
 
 const OpenVPNClientTemplate = `
-client
 dev tun
 proto tcp-client
 remote 127.0.0.1 1194
+ifconfig 10.8.0.2 10.8.0.1
 nobind
-resolv-retry infinite
 persist-key
 persist-tun
 cipher AES-256-CBC
