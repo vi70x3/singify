@@ -11,6 +11,7 @@ dev tun_ovpn
 proto tcp-server
 lport 1194
 ifconfig 10.8.0.1 10.8.0.2
+tun-mtu 1300
 keepalive 10 60
 secret %s
 status %s
@@ -25,11 +26,12 @@ dev tun
 proto tcp-client
 remote 127.0.0.1 1194
 ifconfig 10.8.0.2 10.8.0.1
+tun-mtu 1300
+mssfix 1200
 nobind
 persist-key
 persist-tun
 keepalive 10 60
-mssfix 1200
 cipher AES-256-CBC
 data-ciphers AES-256-CBC
 data-ciphers-fallback AES-256-CBC

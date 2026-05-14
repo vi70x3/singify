@@ -109,6 +109,8 @@ func main() {
 		fmt.Printf("[*] Bypassing VPN for VLESS IP: %s (GW: %s, Dev: %s)\n", vlessIP, gwIP, physDev)
 		exec.Command("ip", "route", "add", vlessIP, "via", gwIP, "dev", physDev).Run()
 		exec.Command("ip", "route", "add", "8.8.8.8", "via", gwIP, "dev", physDev).Run()
+		exec.Command("ip", "route", "add", "1.1.1.1", "via", gwIP, "dev", physDev).Run()
+		exec.Command("ip", "route", "add", "9.9.9.9", "via", gwIP, "dev", physDev).Run()
 		time.Sleep(2 * time.Second) 
 	}
 
@@ -151,6 +153,8 @@ func main() {
 	if vlessIP != "" && gwIP != "" && physDev != "" {
 		exec.Command("ip", "route", "del", vlessIP, "via", gwIP, "dev", physDev).Run()
 		exec.Command("ip", "route", "del", "8.8.8.8", "via", gwIP, "dev", physDev).Run()
+		exec.Command("ip", "route", "del", "1.1.1.1", "via", gwIP, "dev", physDev).Run()
+		exec.Command("ip", "route", "del", "9.9.9.9", "via", gwIP, "dev", physDev).Run()
 	}
 	fmt.Println("[+] Done.")
 }

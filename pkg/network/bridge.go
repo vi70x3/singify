@@ -13,6 +13,10 @@ func SetupIPTables() error {
 	// Enable IP Forwarding
 	exec.Command("sysctl", "-w", "net.ipv4.ip_forward=1").Run()
 
+	// Force MTU on the interfaces
+	exec.Command("ip", "link", "set", "dev", "tun_ovpn", "mtu", "1300").Run()
+	exec.Command("ip", "link", "set", "dev", "tun_singbox", "mtu", "1300").Run()
+
 	rules := [][]string{
 		{"-t", "nat", "-A", "POSTROUTING", "-s", "10.8.0.0/24", "-o", "tun_singbox", "-j", "MASQUERADE"},
 		{"-A", "FORWARD", "-i", "tun_ovpn", "-o", "tun_singbox", "-j", "ACCEPT"},
