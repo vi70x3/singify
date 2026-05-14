@@ -10,8 +10,8 @@ import (
 
 type SingBoxConfig struct {
 	Log       LogConfig         `json:"log"`
-	DNS       *DNSConfig        `json:"dns,omitempty"`
-	Inbounds  []InboundConfig    `json:"inbounds"`
+	DNS       DNSConfig         `json:"dns"`
+	Inbounds  []InboundConfig   `json:"inbounds"`
 	Outbounds []json.RawMessage `json:"outbounds"`
 	Route     RouteConfig       `json:"route"`
 }
@@ -28,8 +28,10 @@ type DNSServerConfig struct {
 }
 
 type DNSRuleConfig struct {
-	Server string   `json:"server,omitempty"`
-	Domain []string `json:"domain,omitempty"`
+	Outbound      string   `json:"outbound,omitempty"`
+	Server        string   `json:"server,omitempty"`
+	DisableCache  bool     `json:"disable_cache,omitempty"`
+	QueryType     []string `json:"query_type,omitempty"`
 }
 
 type LogConfig struct {
@@ -39,11 +41,12 @@ type LogConfig struct {
 type InboundConfig struct {
 	Type          string   `json:"type"`
 	Tag           string   `json:"tag"`
-	InterfaceName string   `json:"interface_name,omitempty"`
-	Address       []string `json:"address,omitempty"`
-	AutoRoute     bool     `json:"auto_route,omitempty"`
-	StrictRoute   bool     `json:"strict_route,omitempty"`
-	Stack         string   `json:"stack,omitempty"`
+	InterfaceName string   `json:"interface_name"`
+	Address       []string `json:"address"`
+	AutoRoute     bool     `json:"auto_route"`
+	StrictRoute   bool     `json:"strict_route"`
+	Stack         string   `json:"stack"`
+	Sniff         bool     `json:"sniff"`
 }
 
 type OutboundConfig struct {
@@ -52,130 +55,96 @@ type OutboundConfig struct {
 	Server         string     `json:"server,omitempty"`
 	ServerPort     int        `json:"server_port,omitempty"`
 	UUID           string     `json:"uuid,omitempty"`
-	Flow           string     `json:"flow,omitempty"`
-	PacketEncoding string     `json:"packet_encoding,omitempty"`
 	TLS            *TLSConfig `json:"tls,omitempty"`
-	BindInterface  string     `json:"bind_interface,omitempty"`
 }
 
 type TLSConfig struct {
 	Enabled    bool   `json:"enabled"`
 	ServerName string `json:"server_name,omitempty"`
-	Insecure   bool   `json:"insecure,omitempty"`
 }
 
 type RouteConfig struct {
-	Rules []RuleConfig `json:"rules"`
+	AutoDetectInterface bool         `json:"auto_detect_interface"`
+	Rules               []RuleConfig `json:"rules"`
 }
 
 type RuleConfig struct {
-	Action   string   `json:"action,omitempty"`
+	Action   string   `json:"action"`
 	Protocol []string `json:"protocol,omitempty"`
-	Outbound string   `json:"outbound,omitempty"`
-	Domain   []string `json:"domain,omitempty"`
+	Port     int      `json:"port,omitempty"`
 }
 
-func GenerateConfig(nodes []subscription.Node, configPath, physDev string) error {
+func GenerateConfig(nodes []subscription.Node, configPath string) error {
 	cfg := SingBoxConfig{
 		Log: LogConfig{Level: "info"},
-		DNS: &DNSConfig{
+		DNS: DNSConfig{
 			Servers: []DNSServerConfig{
-				{
-					Tag:     "dns-direct",
-					Address: "8.8.8.8",
-					Detour:  "direct",
-				},
+				{Tag: "proxy-dns", Address: "https://8.8.8.8/dns-query", Detour: "proxy"},
+				{Tag: "local-dns", Address: "8.8.8.8", Detour: "direct"},
 			},
 			Rules: []DNSRuleConfig{
-				{
-					Server: "dns-direct",
-					Domain: []string{},
-				},
+				{Outbound: "any", Server: "local-dns", DisableCache: true},
+				{QueryType: []string{"A", "AAAA"}, Server: "proxy-dns"},
 			},
 		},
 		Inbounds: []InboundConfig{
 			{
 				Type:          "tun",
 				Tag:           "tun-in",
-				InterfaceName: "tun_singbox",
-				Address:       []string{"172.16.0.2/30"},
-				AutoRoute:     false,
-				Stack:         "gvisor",
+				InterfaceName: "tun0",
+				Address:       []string{"172.19.0.1/30"},
+				AutoRoute:     true,
+				StrictRoute:   true,
+				Stack:         "system",
+				Sniff:         true,
 			},
 		},
 		Route: RouteConfig{
+			AutoDetectInterface: true,
 			Rules: []RuleConfig{
-				{Action: "sniff"},
-				{
-					Protocol: []string{"dns"},
-					Action:   "hijack-dns",
-				},
-				{
-					Outbound: "direct",
-					Domain:   []string{},
-				},
-				{
-					Outbound: "proxy",
-				},
+				{Action: "hijack-dns", Protocol: []string{"dns"}},
+				{Action: "hijack-dns", Port: 53},
 			},
 		},
 	}
 
-	// Use the first node as the proxy
 	if len(nodes) > 0 {
 		node := nodes[0]
 		var outboundRaw json.RawMessage
 
-		if node.Host != "" {
-			cfg.DNS.Rules[0].Domain = append(cfg.DNS.Rules[0].Domain, node.Host)
-			cfg.Route.Rules[2].Domain = append(cfg.Route.Rules[2].Domain, node.Host)
-		}
-
 		if node.Raw != nil {
-			// Override tag to "proxy" so our routing rule works
 			var m map[string]interface{}
 			if err := json.Unmarshal(node.Raw, &m); err == nil {
 				m["tag"] = "proxy"
-				m["bind_interface"] = physDev
 				outboundRaw, _ = json.Marshal(m)
 			} else {
 				outboundRaw = node.Raw
 			}
 		} else {
-			// Fallback to manual construction (for vless:// links)
-			port := 443
 			manual := OutboundConfig{
-				Type:          "vless",
-				Tag:           "proxy",
-				Server:        node.Host,
-				ServerPort:    port,
-				UUID:          node.UUID,
-				TLS:           &TLSConfig{Enabled: true, ServerName: node.Host},
-				BindInterface: physDev,
+				Type:       "vless",
+				Tag:        "proxy",
+				Server:     node.Host,
+				ServerPort: 443,
+				UUID:       node.UUID,
+				TLS:        &TLSConfig{Enabled: true, ServerName: node.Host},
 			}
 			outboundRaw, _ = json.Marshal(manual)
 		}
 		cfg.Outbounds = append(cfg.Outbounds, outboundRaw)
 	}
 
-	direct := OutboundConfig{
-		Type:          "direct",
-		Tag:           "direct",
-		BindInterface: physDev,
-	}
-	directRaw, _ := json.Marshal(direct)
-	cfg.Outbounds = append(cfg.Outbounds, directRaw)
+	cfg.Outbounds = append(cfg.Outbounds, json.RawMessage(`{"type": "direct", "tag": "direct"}`))
 
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
-
 	return os.WriteFile(configPath, data, 0644)
 }
 
 func RunSingBox(configPath string, verbose bool) (*exec.Cmd, error) {
-	fmt.Printf("[debug] Running sing-box with config: %s\n", configPath)
+	fmt.Printf("[debug] Running sing-box: %s\n", configPath)
 	cmd := exec.Command("sing-box", "run", "-c", configPath)
 	if verbose {
 		cmd.Stdout = os.Stdout
@@ -184,7 +153,6 @@ func RunSingBox(configPath string, verbose bool) (*exec.Cmd, error) {
 		logFile, _ := os.OpenFile("temp/sing-box.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 		cmd.Stdout = logFile
 		cmd.Stderr = logFile
-		fmt.Println("[*] Sing-box logs redirected to temp/sing-box.log")
 	}
 	err := cmd.Start()
 	return cmd, err
