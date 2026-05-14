@@ -12,6 +12,8 @@ ifconfig 10.8.0.1 10.8.0.2
 secret %s
 port 1194
 proto udp
+cipher AES-256-GCM
+data-ciphers AES-256-GCM
 status %s
 verb 3
 `
@@ -22,6 +24,8 @@ dev tun
 ifconfig 10.8.0.2 10.8.0.1
 secret %s
 proto udp
+cipher AES-256-GCM
+data-ciphers AES-256-GCM
 redirect-gateway def1
 `
 

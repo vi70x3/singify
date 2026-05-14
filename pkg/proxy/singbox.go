@@ -10,9 +10,28 @@ import (
 
 type SingBoxConfig struct {
 	Log       LogConfig         `json:"log"`
+	DNS       *DNSConfig        `json:"dns,omitempty"`
 	Inbounds  []InboundConfig    `json:"inbounds"`
 	Outbounds []json.RawMessage `json:"outbounds"`
 	Route     RouteConfig       `json:"route"`
+}
+
+type DNSConfig struct {
+	Servers []DNSServerConfig `json:"servers"`
+	Rules   []DNSRuleConfig   `json:"rules"`
+}
+
+type DNSServerConfig struct {
+	Tag      string `json:"tag"`
+	Address  string `json:"address"`
+	Detour   string `json:"detour,omitempty"`
+	Strategy string `json:"strategy,omitempty"`
+}
+
+type DNSRuleConfig struct {
+	Outbound string   `json:"outbound,omitempty"`
+	Server   string   `json:"server,omitempty"`
+	Domain   []string `json:"domain,omitempty"`
 }
 
 type LogConfig struct {
@@ -59,6 +78,25 @@ type RuleConfig struct {
 func GenerateConfig(nodes []subscription.Node, configPath string) error {
 	cfg := SingBoxConfig{
 		Log: LogConfig{Level: "info"},
+		DNS: &DNSConfig{
+			Servers: []DNSServerConfig{
+				{
+					Tag:     "dns-direct",
+					Address: "8.8.8.8",
+					Detour:  "direct",
+				},
+				{
+					Tag:     "dns-proxy",
+					Address: "1.1.1.1",
+				},
+			},
+			Rules: []DNSRuleConfig{
+				{
+					Server: "dns-direct",
+					Domain: []string{}, // Will be populated
+				},
+			},
+		},
 		Inbounds: []InboundConfig{
 			{
 				Type:          "tun",
@@ -86,6 +124,11 @@ func GenerateConfig(nodes []subscription.Node, configPath string) error {
 	if len(nodes) > 0 {
 		node := nodes[0]
 		var outboundRaw json.RawMessage
+
+		// Bootstrap DNS: add proxy host to direct DNS rules if it's a domain
+		if node.Host != "" {
+			cfg.DNS.Rules[0].Domain = append(cfg.DNS.Rules[0].Domain, node.Host)
+		}
 
 		if node.Raw != nil {
 			// Override tag to "proxy" so our routing rule works
