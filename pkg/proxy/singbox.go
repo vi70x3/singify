@@ -28,7 +28,6 @@ type DNSServerConfig struct {
 }
 
 type DNSRuleConfig struct {
-	Action string   `json:"action,omitempty"`
 	Server string   `json:"server,omitempty"`
 	Domain []string `json:"domain,omitempty"`
 }
@@ -88,7 +87,6 @@ func GenerateConfig(nodes []subscription.Node, configPath string) error {
 			},
 			Rules: []DNSRuleConfig{
 				{
-					Action: "route",
 					Server: "dns-direct",
 					Domain: []string{}, // Will be populated
 				},

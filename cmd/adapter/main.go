@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"vless-openvpn-adapter/pkg/network"
 	"vless-openvpn-adapter/pkg/proxy"
@@ -66,7 +67,8 @@ func main() {
 	if err := vpn.GenerateClientConfig(*remoteHost, ovpnKey, clientConfig); err != nil {
 		log.Fatalf("Failed to generate client config: %v", err)
 	}
-	fmt.Printf("[+] Client config generated: %s\n", clientConfig)
+	absPath, _ := filepath.Abs(clientConfig)
+	fmt.Printf("[+] Client config generated: %s\n", absPath)
 
 	// 3. Network Setup
 	fmt.Println("[*] Setting up network (requires sudo)...")
