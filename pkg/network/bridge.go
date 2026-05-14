@@ -20,6 +20,7 @@ func SetupIPTables() error {
 		{"-t", "nat", "-A", "POSTROUTING", "-s", "10.8.0.0/24", "-o", "tun_singbox", "-j", "MASQUERADE"},
 		{"-A", "FORWARD", "-i", "tun_ovpn", "-o", "tun_singbox", "-j", "ACCEPT"},
 		{"-A", "FORWARD", "-i", "tun_singbox", "-o", "tun_ovpn", "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"},
+		{"-A", "INPUT", "-p", "tcp", "--dport", "1194", "-j", "ACCEPT"},
 	}
 
 	for _, rule := range rules {
@@ -37,6 +38,7 @@ func CleanupIPTables() error {
 		{"-t", "nat", "-D", "POSTROUTING", "-s", "10.8.0.0/24", "-o", "tun_singbox", "-j", "MASQUERADE"},
 		{"-D", "FORWARD", "-i", "tun_ovpn", "-o", "tun_singbox", "-j", "ACCEPT"},
 		{"-D", "FORWARD", "-i", "tun_singbox", "-o", "tun_ovpn", "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"},
+		{"-D", "INPUT", "-p", "tcp", "--dport", "1194", "-j", "ACCEPT"},
 	}
 
 	for _, rule := range rules {

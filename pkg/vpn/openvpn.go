@@ -7,22 +7,22 @@ import (
 )
 
 const OpenVPNServerTemplate = `
-dev tun_ovpn
+dev tun
 ifconfig 10.8.0.1 10.8.0.2
 secret %s
+status %s
+proto tcp
 port 1194
-proto udp
 cipher AES-256-CBC
 data-ciphers AES-256-CBC
 data-ciphers-fallback AES-256-CBC
-status %s
 verb 3
 `
 
 const OpenVPNClientTemplate = `
 client
 dev tun
-proto udp
+proto tcp
 remote %s 1194
 resolv-retry infinite
 nobind
@@ -42,6 +42,7 @@ route 8.8.8.8 255.255.255.255 net_gateway
 %s
 </secret>
 `
+
 
 func GenerateServerConfig(keyPath, configPath, statusPath string) error {
 	content := fmt.Sprintf(OpenVPNServerTemplate, keyPath, statusPath)
