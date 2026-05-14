@@ -68,7 +68,7 @@ func main() {
 		log.Fatalf("Failed to generate openvpn config: %v", err)
 	}
 
-	if err := vpn.GenerateClientConfig(*remoteHost, ovpnKey, clientConfig); err != nil {
+	if err := vpn.GenerateClientConfig(*remoteHost, nodes[0].Host, ovpnKey, clientConfig); err != nil {
 		log.Fatalf("Failed to generate client config: %v", err)
 	}
 	absPath, _ := filepath.Abs(clientConfig)
