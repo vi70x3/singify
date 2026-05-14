@@ -22,6 +22,7 @@ verb 3
 const OpenVPNClientTemplate = `
 remote %s 1194
 dev tun
+nobind
 ifconfig 10.8.0.2 10.8.0.1
 proto udp
 cipher AES-256-CBC
