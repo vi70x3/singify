@@ -84,23 +84,26 @@ func main() {
 		fmt.Printf("[!] Warning: Failed to setup iptables: %v\n", err)
 	}
 
-	// Detect physical interface and add static routes
-	out, _ := exec.Command("ip", "route", "get", "8.8.8.8").Output()
+	// Detect physical interface and gateway IP
+	out, _ := exec.Command("ip", "route", "show", "default").Output()
 	fields := strings.Fields(string(out))
 	physDev := ""
+	gwIP := ""
 	for i, f := range fields {
 		if f == "dev" && i+1 < len(fields) {
 			physDev = fields[i+1]
-			break
+		}
+		if f == "via" && i+1 < len(fields) {
+			gwIP = fields[i+1]
 		}
 	}
 
-	if physDev != "" {
-		fmt.Printf("[*] Using physical interface: %s\n", physDev)
-		network.AddRoute(nodes[0].Host, physDev)
-		network.AddRoute("8.8.8.8", physDev)
-		
-		time.Sleep(2 * time.Second) // Give routes a moment
+	if physDev != "" && gwIP != "" {
+		fmt.Printf("[*] Bypassing VPN via GW: %s on Intf: %s\n", gwIP, physDev)
+		network.AddRoute(nodes[0].Host, physDev) // Assuming host route is enough
+		exec.Command("ip", "route", "add", nodes[0].Host, "via", gwIP, "dev", physDev).Run()
+		exec.Command("ip", "route", "add", "8.8.8.8", "via", gwIP, "dev", physDev).Run()
+		time.Sleep(2 * time.Second) 
 	}
 
 	// 4. Run Processes
@@ -139,9 +142,9 @@ func main() {
 	// 6. Cleanup
 	fmt.Println("\n[*] Cleaning up...")
 	network.CleanupIPTables()
-	if physDev != "" {
-		network.DelRoute(nodes[0].Host, physDev)
-		network.DelRoute("8.8.8.8", physDev)
+	if physDev != "" && gwIP != "" {
+		exec.Command("ip", "route", "del", nodes[0].Host, "via", gwIP, "dev", physDev).Run()
+		exec.Command("ip", "route", "del", "8.8.8.8", "via", gwIP, "dev", physDev).Run()
 	}
 	fmt.Println("[+] Done.")
 }

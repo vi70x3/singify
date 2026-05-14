@@ -7,12 +7,12 @@ import (
 )
 
 const OpenVPNServerTemplate = `
-dev tun
+dev tun_ovpn
+proto tcp-server
+lport 1194
 ifconfig 10.8.0.1 10.8.0.2
 secret %s
 status %s
-proto tcp
-port 1194
 cipher AES-256-CBC
 data-ciphers AES-256-CBC
 data-ciphers-fallback AES-256-CBC
@@ -22,7 +22,7 @@ verb 3
 const OpenVPNClientTemplate = `
 client
 dev tun
-proto tcp
+proto tcp-client
 remote %s 1194
 nobind
 resolv-retry infinite
@@ -33,14 +33,11 @@ data-ciphers AES-256-CBC
 data-ciphers-fallback AES-256-CBC
 redirect-gateway def1
 
-# Bypass the VPN for the VLESS server and DNS
-route %s 255.255.255.255 net_gateway
-route 8.8.8.8 255.255.255.255 net_gateway
-
 <secret>
 %s
 </secret>
 `
+
 
 
 func GenerateServerConfig(keyPath, configPath, statusPath string) error {
