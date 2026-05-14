@@ -9,6 +9,7 @@ This tool automates the process of fetching VLESS subscriptions, configuring Sin
 
 ## Features
 - **Native TUN Engine**: Direct system traffic handling for maximum performance.
+- **Latency-Based Selection**: Automatically pings all available nodes from your subscription and selects the one with the lowest latency for the fastest connection.
 - **Auto-Routing**: Automatically detects the default gateway and routes transport traffic through the physical interface, preventing routing loops.
 - **Stability**: Integrated keepalives and MTU optimization to ensure persistent, reset-free connections.
 - **Self-Contained**: Manages its own routing table and DNS hijacking (via DoH over VLESS) to eliminate dependency on OS-level DNS setups.
