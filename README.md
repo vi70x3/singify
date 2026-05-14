@@ -41,8 +41,3 @@ sudo ENABLE_DEPRECATED_LEGACY_DNS_SERVERS=true \
 
 3. Stop the VPN:
    Press `Ctrl+C`. The tool will automatically clean up the routing table and restore network state.
-
-## Troubleshooting
-- **Connection Reset**: Ensure your VLESS proxy server supports the protocol and is reachable.
-- **DNS Failures**: The tool handles DNS hijacking natively over the tunnel. If you experience issues, check the logs in `temp/sing-box.log`.
-- **MTU/Connectivity**: If traffic hangs, verify the physical interface is active and that IP forwarding is enabled on your host.
