@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 	"vless-openvpn-adapter/pkg/network"
 	"vless-openvpn-adapter/pkg/proxy"
 	"vless-openvpn-adapter/pkg/subscription"
@@ -68,7 +69,7 @@ func main() {
 		log.Fatalf("Failed to generate openvpn config: %v", err)
 	}
 
-	if err := vpn.GenerateClientConfig(*remoteHost, ovpnKey, clientConfig); err != nil {
+	if err := vpn.GenerateClientConfig(*remoteHost, nodes[0].Host, ovpnKey, clientConfig); err != nil {
 		log.Fatalf("Failed to generate client config: %v", err)
 	}
 	absPath, _ := filepath.Abs(clientConfig)
@@ -98,6 +99,8 @@ func main() {
 		fmt.Printf("[*] Using physical interface: %s\n", physDev)
 		network.AddRoute(nodes[0].Host, physDev)
 		network.AddRoute("8.8.8.8", physDev)
+		
+		time.Sleep(2 * time.Second) // Give routes a moment
 	}
 
 	// 4. Run Processes
