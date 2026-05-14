@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -97,10 +98,16 @@ func main() {
 		}
 	}
 
+	var vlessIP string
 	if physDev != "" && gwIP != "" {
-		fmt.Printf("[*] Bypassing VPN via GW: %s on Intf: %s\n", gwIP, physDev)
-		network.AddRoute(nodes[0].Host, physDev) // Assuming host route is enough
-		exec.Command("ip", "route", "add", nodes[0].Host, "via", gwIP, "dev", physDev).Run()
+		ips, err := net.LookupIP(nodes[0].Host)
+		vlessIP = nodes[0].Host
+		if err == nil && len(ips) > 0 {
+			vlessIP = ips[0].String()
+		}
+
+		fmt.Printf("[*] Bypassing VPN for VLESS IP: %s (GW: %s, Dev: %s)\n", vlessIP, gwIP, physDev)
+		exec.Command("ip", "route", "add", vlessIP, "via", gwIP, "dev", physDev).Run()
 		exec.Command("ip", "route", "add", "8.8.8.8", "via", gwIP, "dev", physDev).Run()
 		time.Sleep(2 * time.Second) 
 	}
@@ -141,8 +148,8 @@ func main() {
 	// 6. Cleanup
 	fmt.Println("\n[*] Cleaning up...")
 	network.CleanupIPTables()
-	if physDev != "" && gwIP != "" {
-		exec.Command("ip", "route", "del", nodes[0].Host, "via", gwIP, "dev", physDev).Run()
+	if vlessIP != "" && gwIP != "" && physDev != "" {
+		exec.Command("ip", "route", "del", vlessIP, "via", gwIP, "dev", physDev).Run()
 		exec.Command("ip", "route", "del", "8.8.8.8", "via", gwIP, "dev", physDev).Run()
 	}
 	fmt.Println("[+] Done.")
