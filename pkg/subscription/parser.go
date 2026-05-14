@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"sort"
 	"strings"
+	"time"
 )
 
 type Node struct {
@@ -32,6 +35,39 @@ func FetchSubscription(url string) (string, error) {
 	}
 
 	return string(body), nil
+}
+
+// Ping calculates the latency to a host in milliseconds.
+// Returns a large number (1 hour) if unreachable.
+func (n *Node) Ping() time.Duration {
+	start := time.Now()
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(n.Host, n.Port), 2*time.Second)
+	if err != nil {
+		return time.Hour
+	}
+	defer conn.Close()
+	return time.Since(start)
+}
+
+// SelectFastestNode picks the node with the lowest latency.
+func SelectFastestNode(nodes []Node) Node {
+	type nodeLatency struct {
+		node    Node
+		latency time.Duration
+	}
+
+	var results []nodeLatency
+	for _, node := range nodes {
+		latency := node.Ping()
+		results = append(results, nodeLatency{node, latency})
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].latency < results[j].latency
+	})
+
+	fmt.Printf("[*] Selected node: %s (latency: %v)\n", results[0].node.Remark, results[0].latency)
+	return results[0].node
 }
 
 type singBoxConfig struct {

@@ -33,8 +33,10 @@ func main() {
 	}
 	nodes, err := subscription.ParseLinks(data)
 	if err != nil || len(nodes) == 0 {
-		log.Fatal("No valid VLESS nodes found")
+	        log.Fatal("No valid VLESS nodes found")
 	}
+
+	node := subscription.SelectFastestNode(nodes)
 
 	// 3. Routing Loop Prevention (Bypass VLESS Server)
 	out, _ := exec.Command("ip", "route", "show", "default").Output()
@@ -48,17 +50,16 @@ func main() {
 	// 2. Prepare Config
 	os.MkdirAll("temp", 0755)
 	sbConfig := "temp/sing-box.json"
-	if err := proxy.GenerateConfig(nodes, sbConfig, physDev); err != nil {
+	if err := proxy.GenerateConfig([]subscription.Node{node}, sbConfig, physDev); err != nil {
 	        log.Fatalf("Failed to generate config: %v", err)
 	}
 
-	ips, err := net.LookupIP(nodes[0].Host)
-	vlessIP := nodes[0].Host
+	ips, err := net.LookupIP(node.Host)
+	vlessIP := node.Host
 	if err == nil && len(ips) > 0 { vlessIP = ips[0].String() }
 
 	fmt.Printf("[*] Bypassing VPN for VLESS IP: %s\n", vlessIP)
 	exec.Command("ip", "route", "add", vlessIP, "via", gwIP, "dev", physDev).Run()
-
 	// 4. Start Sing-box
 	fmt.Println("[*] Starting Sing-box...")
 	sbCmd, err := proxy.RunSingBox(sbConfig, *verbose)
