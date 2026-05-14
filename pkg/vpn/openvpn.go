@@ -33,11 +33,6 @@ data-ciphers AES-256-CBC
 data-ciphers-fallback AES-256-CBC
 redirect-gateway def1
 
-# Bypass the VPN for the VLESS server and DNS to avoid loops
-# Syntax: route [network] [mask] [gateway]
-route %s 255.255.255.255 net_gateway
-route 8.8.8.8 255.255.255.255 net_gateway
-
 <secret>
 %s
 </secret>
@@ -54,12 +49,12 @@ func GenerateStaticKey(keyPath string) error {
 	return cmd.Run()
 }
 
-func GenerateClientConfig(remoteHost, proxyHost, keyPath, configPath string) error {
+func GenerateClientConfig(remoteHost, keyPath, configPath string) error {
 	keyData, err := os.ReadFile(keyPath)
 	if err != nil {
 		return err
 	}
-	content := fmt.Sprintf(OpenVPNClientTemplate, remoteHost, proxyHost, string(keyData))
+	content := fmt.Sprintf(OpenVPNClientTemplate, remoteHost, string(keyData))
 	return os.WriteFile(configPath, []byte(content), 0644)
 }
 
