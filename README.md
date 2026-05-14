@@ -5,7 +5,7 @@ A high-performance, native Sing-box based VPN tool that routes system traffic th
 This tool automates the process of fetching VLESS subscriptions, configuring Sing-box as a system-wide TUN provider, and managing necessary routing bypasses to ensure a stable, loop-free connection.
 
 ## Architecture
-`vless-vpn` uses Sing-box's native `tun` inbound with the `gvisor` stack to provide system-wide proxying without the overhead of secondary VPN protocols like OpenVPN.
+`vless-vpn` uses Sing-box's native `tun` inbound with the `gvisor` stack to provide system-wide proxying.
 
 ## Features
 - **Native TUN Engine**: Direct system traffic handling for maximum performance.
