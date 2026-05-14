@@ -37,24 +37,25 @@ type LogConfig struct {
 }
 
 type InboundConfig struct {
-	Type              string `json:"type"`
-	Tag               string `json:"tag"`
-	InterfaceName     string `json:"interface_name,omitempty"`
-	Address           string `json:"address,omitempty"`
-	AutoRoute         bool   `json:"auto_route,omitempty"`
-	StrictRoute       bool   `json:"strict_route,omitempty"`
-	Stack             string `json:"stack,omitempty"`
+	Type          string   `json:"type"`
+	Tag           string   `json:"tag"`
+	InterfaceName string   `json:"interface_name,omitempty"`
+	Address       []string `json:"address,omitempty"`
+	AutoRoute     bool     `json:"auto_route,omitempty"`
+	StrictRoute   bool     `json:"strict_route,omitempty"`
+	Stack         string   `json:"stack,omitempty"`
 }
 
 type OutboundConfig struct {
-	Type         string `json:"type"`
-	Tag          string `json:"tag"`
-	Server       string `json:"server,omitempty"`
-	ServerPort   int    `json:"server_port,omitempty"`
-	UUID         string `json:"uuid,omitempty"`
-	Flow         string `json:"flow,omitempty"`
-	PacketEncoding string `json:"packet_encoding,omitempty"`
-	TLS          *TLSConfig `json:"tls,omitempty"`
+	Type           string     `json:"type"`
+	Tag            string     `json:"tag"`
+	Server         string     `json:"server,omitempty"`
+	ServerPort     int        `json:"server_port,omitempty"`
+	UUID           string     `json:"uuid,omitempty"`
+	Flow           string     `json:"flow,omitempty"`
+	PacketEncoding string     `json:"packet_encoding,omitempty"`
+	TLS            *TLSConfig `json:"tls,omitempty"`
+	BindInterface  string     `json:"bind_interface,omitempty"`
 }
 
 type TLSConfig struct {
@@ -74,7 +75,7 @@ type RuleConfig struct {
 	Domain   []string `json:"domain,omitempty"`
 }
 
-func GenerateConfig(nodes []subscription.Node, configPath string) error {
+func GenerateConfig(nodes []subscription.Node, configPath, physDev string) error {
 	cfg := SingBoxConfig{
 		Log: LogConfig{Level: "info"},
 		DNS: &DNSConfig{
@@ -88,7 +89,7 @@ func GenerateConfig(nodes []subscription.Node, configPath string) error {
 			Rules: []DNSRuleConfig{
 				{
 					Server: "dns-direct",
-					Domain: []string{}, // Will be populated
+					Domain: []string{},
 				},
 			},
 		},
@@ -97,24 +98,21 @@ func GenerateConfig(nodes []subscription.Node, configPath string) error {
 				Type:          "tun",
 				Tag:           "tun-in",
 				InterfaceName: "tun_singbox",
-				Address:       "172.16.0.1/30",
+				Address:       []string{"172.16.0.2/30"},
 				AutoRoute:     false,
-				Stack:         "system",
+				Stack:         "gvisor",
 			},
 		},
 		Route: RouteConfig{
 			Rules: []RuleConfig{
-				{
-					Action: "sniff",
-				},
+				{Action: "sniff"},
 				{
 					Protocol: []string{"dns"},
 					Action:   "hijack-dns",
 				},
 				{
-					Action:   "route",
 					Outbound: "direct",
-					Domain:   []string{}, // Will be populated
+					Domain:   []string{},
 				},
 				{
 					Outbound: "proxy",
@@ -128,7 +126,6 @@ func GenerateConfig(nodes []subscription.Node, configPath string) error {
 		node := nodes[0]
 		var outboundRaw json.RawMessage
 
-		// Bootstrap DNS: route proxy domain via direct DNS and direct outbound
 		if node.Host != "" {
 			cfg.DNS.Rules[0].Domain = append(cfg.DNS.Rules[0].Domain, node.Host)
 			cfg.Route.Rules[2].Domain = append(cfg.Route.Rules[2].Domain, node.Host)
@@ -139,6 +136,7 @@ func GenerateConfig(nodes []subscription.Node, configPath string) error {
 			var m map[string]interface{}
 			if err := json.Unmarshal(node.Raw, &m); err == nil {
 				m["tag"] = "proxy"
+				m["bind_interface"] = physDev
 				outboundRaw, _ = json.Marshal(m)
 			} else {
 				outboundRaw = node.Raw
@@ -147,15 +145,13 @@ func GenerateConfig(nodes []subscription.Node, configPath string) error {
 			// Fallback to manual construction (for vless:// links)
 			port := 443
 			manual := OutboundConfig{
-				Type:       "vless",
-				Tag:        "proxy",
-				Server:     node.Host,
-				ServerPort: port,
-				UUID:       node.UUID,
-				TLS: &TLSConfig{
-					Enabled:    true,
-					ServerName: node.Host,
-				},
+				Type:          "vless",
+				Tag:           "proxy",
+				Server:        node.Host,
+				ServerPort:    port,
+				UUID:          node.UUID,
+				TLS:           &TLSConfig{Enabled: true, ServerName: node.Host},
+				BindInterface: physDev,
 			}
 			outboundRaw, _ = json.Marshal(manual)
 		}
@@ -163,8 +159,9 @@ func GenerateConfig(nodes []subscription.Node, configPath string) error {
 	}
 
 	direct := OutboundConfig{
-		Type: "direct",
-		Tag:  "direct",
+		Type:          "direct",
+		Tag:           "direct",
+		BindInterface: physDev,
 	}
 	directRaw, _ := json.Marshal(direct)
 	cfg.Outbounds = append(cfg.Outbounds, directRaw)

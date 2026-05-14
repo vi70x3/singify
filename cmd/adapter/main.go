@@ -57,7 +57,21 @@ func main() {
 	ovpnStatus := "temp/openvpn-status.log"
 	clientConfig := "client.ovpn"
 
-	if err := proxy.GenerateConfig(nodes, sbConfig); err != nil {
+	// Detect physical interface and gateway IP
+	out, _ := exec.Command("ip", "route", "show", "default").Output()
+	fields := strings.Fields(string(out))
+	physDev := ""
+	gwIP := ""
+	for i, f := range fields {
+		if f == "dev" && i+1 < len(fields) {
+			physDev = fields[i+1]
+		}
+		if f == "via" && i+1 < len(fields) {
+			gwIP = fields[i+1]
+		}
+	}
+
+	if err := proxy.GenerateConfig(nodes, sbConfig, physDev); err != nil {
 		log.Fatalf("Failed to generate sing-box config: %v", err)
 	}
 
@@ -82,20 +96,6 @@ func main() {
 	}
 	if err := network.SetupIPTables(); err != nil {
 		fmt.Printf("[!] Warning: Failed to setup iptables: %v\n", err)
-	}
-
-	// Detect physical interface and gateway IP
-	out, _ := exec.Command("ip", "route", "show", "default").Output()
-	fields := strings.Fields(string(out))
-	physDev := ""
-	gwIP := ""
-	for i, f := range fields {
-		if f == "dev" && i+1 < len(fields) {
-			physDev = fields[i+1]
-		}
-		if f == "via" && i+1 < len(fields) {
-			gwIP = fields[i+1]
-		}
 	}
 
 	var vlessIP string

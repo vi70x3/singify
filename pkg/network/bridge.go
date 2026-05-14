@@ -10,12 +10,9 @@ func EnableIPForwarding() error {
 }
 
 func SetupIPTables() error {
-	// 1. Flush existing rules (be careful in production, but here we want a clean state for our bridge)
-	// For now, just add the necessary rules.
-	
-	// 2. Allow forwarding between OpenVPN and Sing-box TUN
-	// Assuming OpenVPN is 10.8.0.0/24 and Sing-box TUN is 172.16.0.1/30
-	
+	// Enable IP Forwarding
+	exec.Command("sysctl", "-w", "net.ipv4.ip_forward=1").Run()
+
 	rules := [][]string{
 		{"-t", "nat", "-A", "POSTROUTING", "-s", "10.8.0.0/24", "-o", "tun_singbox", "-j", "MASQUERADE"},
 		{"-A", "FORWARD", "-i", "tun_ovpn", "-o", "tun_singbox", "-j", "ACCEPT"},
