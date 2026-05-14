@@ -33,7 +33,7 @@ data-ciphers AES-256-CBC
 data-ciphers-fallback AES-256-CBC
 redirect-gateway def1
 
-# Bypass the VPN for the VLESS server and DNS to avoid loops
+# Bypass the VPN for the VLESS server and DNS
 route %s 255.255.255.255 net_gateway
 route 8.8.8.8 255.255.255.255 net_gateway
 
