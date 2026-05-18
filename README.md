@@ -1,4 +1,4 @@
-# vless-vpn
+# singify
 
 A high-performance, native Sing-box based VPN tool that routes system traffic through VLESS proxy nodes. 
 
