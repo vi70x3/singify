@@ -9,7 +9,9 @@ This tool automates the process of fetching VLESS subscriptions, configuring Sin
 
 ## Features
 - **Native TUN Engine**: Direct system traffic handling for maximum performance.
-- **Latency-Based Selection**: Automatically pings all available nodes from your subscription and selects the one with the lowest latency for the fastest connection.
+- **Concurrent Latency Selection**: Simultaneously pings all available nodes from your subscription/file and selects the one with the lowest latency instantly.
+- **Local & Remote Support**: Works with both subscription URLs and local Sing-box JSON configuration files.
+- **Protocol Filtering**: Optional VLESS-only filtering (enabled by default) to ensure compatibility.
 - **Auto-Routing**: Automatically detects the default gateway and routes transport traffic through the physical interface, preventing routing loops.
 - **Stability**: Integrated keepalives and MTU optimization to ensure persistent, reset-free connections.
 - **Self-Contained**: Manages its own routing table and DNS hijacking (via DoH over VLESS) to eliminate dependency on OS-level DNS setups.
@@ -28,15 +30,15 @@ This tool automates the process of fetching VLESS subscriptions, configuring Sin
 2. Run the VPN using the provided helper script:
    ```bash
    chmod +x run_vpn.sh
+   # Use a subscription URL
    sudo ./run_vpn.sh "YOUR_SUBSCRIPTION_URL"
+   # OR use a local JSON file
+   sudo ./run_vpn.sh "config.json"
    ```
 
-The script automatically sets the required environment variables:
+The script automatically sets the required environment variables. You can also run the binary directly with additional flags:
 ```bash
-sudo ENABLE_DEPRECATED_LEGACY_DNS_SERVERS=true \
-     ENABLE_DEPRECATED_OUTBOUND_DNS_RULE_ITEM=true \
-     ENABLE_DEPRECATED_MISSING_DOMAIN_RESOLVER=true \
-     ./vless-vpn -sub "YOUR_SUBSCRIPTION_URL" -v
+sudo ./vless-vpn -sub "config.json" -vless-only=true -v
 ```
 
 3. Stop the VPN:

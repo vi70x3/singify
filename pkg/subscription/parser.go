@@ -23,7 +23,10 @@ type Node struct {
 }
 
 func FetchSubscription(url string) (string, error) {
-	resp, err := http.Get(url)
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	resp, err := client.Get(url)
 	if err != nil {
 		return "", err
 	}
@@ -49,25 +52,43 @@ func (n *Node) Ping() time.Duration {
 	return time.Since(start)
 }
 
-// SelectFastestNode picks the node with the lowest latency.
+// SelectFastestNode picks the node with the lowest latency using concurrent pings.
 func SelectFastestNode(nodes []Node) Node {
 	type nodeLatency struct {
 		node    Node
 		latency time.Duration
 	}
 
-	var results []nodeLatency
+	resultsChan := make(chan nodeLatency, len(nodes))
+
+	fmt.Printf("[*] Pinging %d nodes concurrently...\n", len(nodes))
 	for _, node := range nodes {
-		latency := node.Ping()
-		results = append(results, nodeLatency{node, latency})
+		go func(n Node) {
+			latency := n.Ping()
+			resultsChan <- nodeLatency{n, latency}
+		}(node)
+	}
+
+	var results []nodeLatency
+	for i := 0; i < len(nodes); i++ {
+		res := <-resultsChan
+		if res.latency < time.Hour {
+			fmt.Printf("[debug] %s: %v\n", res.node.Remark, res.latency)
+		}
+		results = append(results, res)
 	}
 
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].latency < results[j].latency
 	})
 
-	fmt.Printf("[*] Selected node: %s (latency: %v)\n", results[0].node.Remark, results[0].latency)
-	return results[0].node
+	if len(results) > 0 && results[0].latency < time.Hour {
+		fmt.Printf("[*] Selected node: %s (latency: %v)\n", results[0].node.Remark, results[0].latency)
+		return results[0].node
+	}
+
+	fmt.Println("[!] No reachable nodes found, picking first one as fallback")
+	return nodes[0]
 }
 
 type singBoxConfig struct {
@@ -75,12 +96,13 @@ type singBoxConfig struct {
 }
 
 type outboundFull struct {
-	Type   string `json:"type"`
-	Tag    string `json:"tag"`
-	Server string `json:"server"`
+	Type       string `json:"type"`
+	Tag        string `json:"tag"`
+	Server     string `json:"server"`
+	ServerPort int    `json:"server_port"`
 }
 
-func ParseLinks(data string) ([]Node, error) {
+func ParseLinks(data string, vlessOnly bool) ([]Node, error) {
 	// Try parsing as Sing-box JSON first
 	var sbCfg singBoxConfig
 	if err := json.Unmarshal([]byte(data), &sbCfg); err == nil && len(sbCfg.Outbounds) > 0 {
@@ -88,12 +110,16 @@ func ParseLinks(data string) ([]Node, error) {
 		for _, raw := range sbCfg.Outbounds {
 			var out outboundFull
 			if err := json.Unmarshal(raw, &out); err == nil {
+				if vlessOnly && out.Type != "vless" {
+					continue
+				}
 				// Only include actual proxy protocols
 				if out.Type == "vless" || out.Type == "trojan" || out.Type == "hysteria2" || out.Type == "vmess" {
 					nodes = append(nodes, Node{
 						Protocol: out.Type,
 						Remark:   out.Tag,
 						Host:     out.Server,
+						Port:     fmt.Sprintf("%d", out.ServerPort),
 						Raw:      raw,
 					})
 				}
@@ -122,6 +148,9 @@ func ParseLinks(data string) ([]Node, error) {
 
 		node, err := parseLink(link)
 		if err == nil {
+			if vlessOnly && node.Protocol != "vless" {
+				continue
+			}
 			nodes = append(nodes, node)
 		}
 	}

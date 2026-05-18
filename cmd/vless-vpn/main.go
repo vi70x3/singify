@@ -15,28 +15,43 @@ import (
 )
 
 func main() {
-	subURL := flag.String("sub", "", "VLESS subscription URL")
-	verbose := flag.Bool("v", false, "Show verbose logs")
-	flag.Parse()
+        subPath := flag.String("sub", "", "VLESS subscription URL or local JSON file path")
+        verbose := flag.Bool("v", false, "Show verbose logs")
+        vlessOnly := flag.Bool("vless-only", true, "Only include VLESS nodes")
+        flag.Parse()
 
-	if *subURL == "" {
-		log.Fatal("Subscription URL is required. Use -sub <url>")
-	}
+        if *subPath == "" {
+                log.Fatal("Subscription URL or file path is required. Use -sub <url|path>")
+        }
 
-	fmt.Println("--- VLESS Native VPN ---")
+        fmt.Println("--- VLESS Native VPN ---")
 
-	// 1. Fetch Subscription
-	fmt.Println("[*] Fetching subscription...")
-	data, err := subscription.FetchSubscription(*subURL)
-	if err != nil {
-		log.Fatalf("Failed: %v", err)
-	}
-	nodes, err := subscription.ParseLinks(data)
-	if err != nil || len(nodes) == 0 {
-	        log.Fatal("No valid VLESS nodes found")
-	}
+        var data string
+        var err error
 
-	node := subscription.SelectFastestNode(nodes)
+        // 1. Fetch Subscription or Read File
+        if _, err := os.Stat(*subPath); err == nil {
+                content, err := os.ReadFile(*subPath)
+                if err != nil {
+                        log.Fatalf("Failed to read file: %v", err)
+                }
+                data = string(content)
+        } else {
+                fmt.Println("[*] Fetching subscription...")
+                data, err = subscription.FetchSubscription(*subPath)
+                if err != nil {
+                        log.Fatalf("Failed to fetch subscription: %v", err)
+                }
+        }
+
+        fmt.Println("[*] Parsing nodes...")
+        nodes, err := subscription.ParseLinks(data, *vlessOnly)
+        if err != nil || len(nodes) == 0 {
+                log.Fatal("No valid nodes found")
+        }
+        fmt.Printf("[*] Found %d nodes (vless-only: %v)\n", len(nodes), *vlessOnly)
+
+        node := subscription.SelectFastestNode(nodes)
 
 	// 3. Routing Loop Prevention (Bypass VLESS Server)
 	out, _ := exec.Command("ip", "route", "show", "default").Output()
