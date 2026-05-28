@@ -73,6 +73,7 @@ Local SOCKS5+HTTP proxy on `127.0.0.1:1080` (configurable with `-port` and `-lis
 - **Browser**: Configure SOCKS5 proxy in browser settings (127.0.0.1:1080)
 
 ## Flags
+
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-sub` | (required) | Subscription URL or local JSON file path |

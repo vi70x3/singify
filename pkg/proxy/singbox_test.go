@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 	"vless-openvpn-adapter/pkg/subscription"
 )
@@ -65,9 +66,7 @@ func TestFindFreePortWithBusyPort(t *testing.T) {
 
 func TestGenerateProxyConfig(t *testing.T) {
 	nodes := []subscription.Node{createTestNode()}
-	configPath := "temp/test-proxy-config.json"
-
-	os.MkdirAll("temp", 0755)
+	configPath := filepath.Join(t.TempDir(), "test-proxy-config.json")
 
 	err := GenerateProxyConfig(nodes, configPath, "127.0.0.1", 1080)
 	if err != nil {
@@ -121,9 +120,7 @@ func TestGenerateProxyConfig(t *testing.T) {
 
 func TestGenerateTUNConfig(t *testing.T) {
 	nodes := []subscription.Node{createTestNode()}
-	configPath := "temp/test-tun-config.json"
-
-	os.MkdirAll("temp", 0755)
+	configPath := filepath.Join(t.TempDir(), "test-tun-config.json")
 
 	err := GenerateTUNConfig(nodes, configPath, "eth0")
 	if err != nil {

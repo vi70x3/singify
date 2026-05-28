@@ -10,10 +10,14 @@ import (
 )
 
 // FindFreePort attempts to find an available TCP port starting from startPort.
-// If startPort is occupied, it increments until a free port is found (up to startPort+100).
+// If startPort is occupied, it increments until a free port is found (up to 100 attempts, capped at 65535).
 // Returns the available port number, or an error if no port is found in range.
 func FindFreePort(startPort int) (int, error) {
-	for port := startPort; port < startPort+100; port++ {
+	maxPort := startPort + 100
+	if maxPort > 65535 {
+		maxPort = 65535
+	}
+	for port := startPort; port < maxPort; port++ {
 		addr := fmt.Sprintf("127.0.0.1:%d", port)
 		ln, err := net.Listen("tcp", addr)
 		if err == nil {
@@ -21,16 +25,21 @@ func FindFreePort(startPort int) (int, error) {
 			return port, nil
 		}
 	}
-	return 0, fmt.Errorf("no free port found in range %d-%d", startPort, startPort+100)
+	return 0, fmt.Errorf("no free port found in range %d-%d", startPort, maxPort)
 }
 
 // GenerateTUNConfig creates a sing-box configuration for TUN (system-wide VPN) mode.
 func GenerateTUNConfig(nodes []subscription.Node, configPath, physDev string) error {
+	if len(nodes) == 0 {
+		return fmt.Errorf("no nodes available to generate TUN config")
+	}
 	node := nodes[0]
 
 	// Prepare the VLESS outbound by injecting the bind_interface
 	var vlessOutbound map[string]interface{}
-	json.Unmarshal(node.Raw, &vlessOutbound)
+	if err := json.Unmarshal(node.Raw, &vlessOutbound); err != nil {
+		return fmt.Errorf("failed to parse node outbound JSON: %w", err)
+	}
 	vlessOutbound["tag"] = "proxy"
 	vlessOutbound["bind_interface"] = physDev
 
@@ -100,19 +109,27 @@ func GenerateTUNConfig(nodes []subscription.Node, configPath, physDev string) er
 		},
 	}
 
-	data, _ := json.MarshalIndent(cfg, "", "  ")
-	return os.WriteFile(configPath, data, 0644)
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal TUN config: %w", err)
+	}
+	return os.WriteFile(configPath, data, 0600)
 }
 
 // GenerateProxyConfig creates a sing-box configuration for local proxy mode.
 // It uses a mixed (SOCKS5+HTTP) inbound instead of TUN, and does not bind interfaces
 // since system routing is untouched.
 func GenerateProxyConfig(nodes []subscription.Node, configPath string, listenAddr string, listenPort int) error {
+	if len(nodes) == 0 {
+		return fmt.Errorf("no nodes available to generate proxy config")
+	}
 	node := nodes[0]
 
 	// Prepare the VLESS outbound — no bind_interface in proxy mode
 	var vlessOutbound map[string]interface{}
-	json.Unmarshal(node.Raw, &vlessOutbound)
+	if err := json.Unmarshal(node.Raw, &vlessOutbound); err != nil {
+		return fmt.Errorf("failed to parse node outbound JSON: %w", err)
+	}
 	vlessOutbound["tag"] = "proxy"
 
 	cfg := map[string]interface{}{
@@ -177,8 +194,11 @@ func GenerateProxyConfig(nodes []subscription.Node, configPath string, listenAdd
 		},
 	}
 
-	data, _ := json.MarshalIndent(cfg, "", "  ")
-	return os.WriteFile(configPath, data, 0644)
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal proxy config: %w", err)
+	}
+	return os.WriteFile(configPath, data, 0600)
 }
 
 // GenerateConfig is a backward-compatible alias for GenerateTUNConfig.
@@ -193,7 +213,10 @@ func RunSingBox(configPath string, verbose bool) (*exec.Cmd, error) {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	} else {
-		logFile, _ := os.OpenFile("temp/sing-box.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		logFile, err := os.OpenFile("temp/sing-box.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open log file: %w", err)
+		}
 		cmd.Stdout = logFile
 		cmd.Stderr = logFile
 	}

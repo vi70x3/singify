@@ -93,10 +93,10 @@ Create a new function `GenerateProxyConfig(nodes []subscription.Node, configPath
 - Accepts configurable listen address and port (defaults: `127.0.0.1`, `1080`)
 - Writes the config JSON to `configPath`
 
-Also add a helper `FindFreePort(startPort int) int` in `pkg/proxy/` that:
+Also add a helper `FindFreePort(startPort int) (int, error)` in `pkg/proxy/` that:
 - Attempts to listen on `startPort` via `net.Listen`
 - If it fails (port busy), increments and tries `startPort+1`, `startPort+2`, etc.
-- Returns the first available port
+- Returns the first available port or an error if none found in range (capped at 65535)
 - Used by `main.go` before calling `GenerateProxyConfig()` so the config always uses a free port
 
 Also rename the existing `GenerateConfig()` to `GenerateTUNConfig()` for clarity, or keep both names.

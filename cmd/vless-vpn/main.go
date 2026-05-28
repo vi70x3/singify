@@ -75,7 +75,10 @@ func main() {
 	nodes = []subscription.Node{bestNode}
 
 	// Step 4: Create temp directory
-	os.MkdirAll("temp", 0755)
+	if err := os.MkdirAll("temp", 0755); err != nil {
+		fmt.Printf("[!] Error creating temp directory: %v\n", err)
+		os.Exit(1)
+	}
 
 	configPath := "temp/sing-box-config.json"
 
@@ -153,17 +156,29 @@ func waitForInterrupt(cmd *exec.Cmd) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	// Monitor sing-box process exit in background
+	doneChan := make(chan error, 1)
+	go func() {
+		doneChan <- cmd.Wait()
+	}()
+
 	fmt.Println("[*] Press Ctrl+C to stop...")
 
-	sig := <-sigChan
-	fmt.Printf("\n[*] Received signal: %v. Shutting down...\n", sig)
-
-	if cmd.Process != nil {
-		cmd.Process.Kill()
+	select {
+	case sig := <-sigChan:
+		fmt.Printf("\n[*] Received signal: %v. Shutting down...\n", sig)
+		if cmd.Process != nil {
+			cmd.Process.Kill()
+		}
 		cmd.Wait()
+		fmt.Println("[*] sing-box stopped. Clean exit.")
+	case err := <-doneChan:
+		if err != nil {
+			fmt.Printf("[!] sing-box exited unexpectedly: %v\n", err)
+		} else {
+			fmt.Println("[!] sing-box exited unexpectedly (no error).")
+		}
 	}
-
-	fmt.Println("[*] sing-box stopped. Clean exit.")
 }
 
 // detectPhysicalDevice finds the network interface and gateway for the default route.
@@ -208,11 +223,12 @@ func detectPhysicalDevice() (string, string, error) {
 	var gateway, dev string
 	for _, line := range strings.Split(string(out), "\n") {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "gateway:") {
-			gateway = strings.Fields(line)[1]
+		fields := strings.Fields(line)
+		if strings.HasPrefix(line, "gateway:") && len(fields) >= 2 {
+			gateway = fields[1]
 		}
-		if strings.HasPrefix(line, "interface:") {
-			dev = strings.Fields(line)[1]
+		if strings.HasPrefix(line, "interface:") && len(fields) >= 2 {
+			dev = fields[1]
 		}
 	}
 
