@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -74,13 +75,14 @@ func main() {
 	bestNode := subscription.SelectFastestNode(nodes)
 	nodes = []subscription.Node{bestNode}
 
-	// Step 4: Create temp directory
-	if err := os.MkdirAll("temp", 0755); err != nil {
+	// Step 4: Create temp directory under os.TempDir() (always writable by current user)
+	tempDir := filepath.Join(os.TempDir(), "singify")
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
 		fmt.Printf("[!] Error creating temp directory: %v\n", err)
 		os.Exit(1)
 	}
 
-	configPath := "temp/sing-box-config.json"
+	configPath := filepath.Join(tempDir, "sing-box-config.json")
 
 	// Step 5: Generate config based on mode
 	switch *mode {

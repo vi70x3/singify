@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"vless-openvpn-adapter/pkg/subscription"
 )
 
@@ -213,7 +214,8 @@ func RunSingBox(configPath string, verbose bool) (*exec.Cmd, error) {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	} else {
-		logFile, err := os.OpenFile("temp/sing-box.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+		logPath := filepath.Join(filepath.Dir(configPath), "sing-box.log")
+		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open log file: %w", err)
 		}
