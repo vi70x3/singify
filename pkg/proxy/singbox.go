@@ -3,12 +3,29 @@ package proxy
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"vless-openvpn-adapter/pkg/subscription"
 )
 
-func GenerateConfig(nodes []subscription.Node, configPath, physDev string) error {
+// FindFreePort attempts to find an available TCP port starting from startPort.
+// If startPort is occupied, it increments until a free port is found (up to startPort+100).
+// Returns the available port number, or an error if no port is found in range.
+func FindFreePort(startPort int) (int, error) {
+	for port := startPort; port < startPort+100; port++ {
+		addr := fmt.Sprintf("127.0.0.1:%d", port)
+		ln, err := net.Listen("tcp", addr)
+		if err == nil {
+			ln.Close()
+			return port, nil
+		}
+	}
+	return 0, fmt.Errorf("no free port found in range %d-%d", startPort, startPort+100)
+}
+
+// GenerateTUNConfig creates a sing-box configuration for TUN (system-wide VPN) mode.
+func GenerateTUNConfig(nodes []subscription.Node, configPath, physDev string) error {
 	node := nodes[0]
 
 	// Prepare the VLESS outbound by injecting the bind_interface
@@ -85,6 +102,88 @@ func GenerateConfig(nodes []subscription.Node, configPath, physDev string) error
 
 	data, _ := json.MarshalIndent(cfg, "", "  ")
 	return os.WriteFile(configPath, data, 0644)
+}
+
+// GenerateProxyConfig creates a sing-box configuration for local proxy mode.
+// It uses a mixed (SOCKS5+HTTP) inbound instead of TUN, and does not bind interfaces
+// since system routing is untouched.
+func GenerateProxyConfig(nodes []subscription.Node, configPath string, listenAddr string, listenPort int) error {
+	node := nodes[0]
+
+	// Prepare the VLESS outbound — no bind_interface in proxy mode
+	var vlessOutbound map[string]interface{}
+	json.Unmarshal(node.Raw, &vlessOutbound)
+	vlessOutbound["tag"] = "proxy"
+
+	cfg := map[string]interface{}{
+		"log": map[string]interface{}{
+			"level": "info",
+		},
+		"dns": map[string]interface{}{
+			"servers": []map[string]interface{}{
+				{
+					"tag":     "proxy-dns",
+					"address": "https://8.8.8.8/dns-query",
+					"detour":  "proxy",
+				},
+				{
+					"tag":     "local-dns",
+					"address": "8.8.8.8",
+					"detour":  "direct",
+				},
+			},
+			"rules": []map[string]interface{}{
+				{
+					"outbound": "any",
+					"server":   "local-dns",
+				},
+			},
+		},
+		"inbounds": []map[string]interface{}{
+			{
+				"type":        "mixed",
+				"tag":         "mixed-in",
+				"listen":      listenAddr,
+				"listen_port": listenPort,
+			},
+		},
+		"outbounds": []interface{}{
+			vlessOutbound,
+			map[string]interface{}{
+				"type": "direct",
+				"tag":  "direct",
+			},
+		},
+		"route": map[string]interface{}{
+			"auto_detect_interface": true,
+			"rules": []map[string]interface{}{
+				{
+					"action": "sniff",
+				},
+				{
+					"protocol": "dns",
+					"action":   "hijack-dns",
+				},
+				{
+					"port":   53,
+					"action": "hijack-dns",
+				},
+				{
+					"domain":   []string{node.Host},
+					"action":   "route",
+					"outbound": "direct",
+				},
+			},
+		},
+	}
+
+	data, _ := json.MarshalIndent(cfg, "", "  ")
+	return os.WriteFile(configPath, data, 0644)
+}
+
+// GenerateConfig is a backward-compatible alias for GenerateTUNConfig.
+func GenerateConfig(nodes []subscription.Node, configPath, physDev string) error {
+	return GenerateTUNConfig(nodes, configPath, physDev)
 }
 
 func RunSingBox(configPath string, verbose bool) (*exec.Cmd, error) {
